@@ -204,7 +204,7 @@
 
         function renderDevices() {
             if (devices.length === 0) {
-                document.getElementById('deviceList').innerHTML = '<div class="text-center text-gray-400 py-8">Chua co thiet bi</div>';
+                document.getElementById('deviceList').innerHTML = '<div class="text-center text-gray-400 py-8">Chưa có thiết bị</div>';
                 document.getElementById('addressTable').style.display = 'none';
             } else {
                 const html = devices.map((d, i) => {
@@ -452,3 +452,4 @@
     </script>
 </body>
 </html>
+
