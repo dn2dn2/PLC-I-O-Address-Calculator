@@ -8,10 +8,11 @@
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen p-6">
     <div class="max-w-7xl mx-auto">
-        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
             <div class="flex justify-between items-center mb-4">
                 <h1 class="text-3xl font-bold text-blue-600">PLC I/O Address Calculator</h1>
                 <div class="flex gap-3">
+                    <button onclick="clearAllData()" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">Xoá tất cả dữ liệu</button>
                     <select id="plcBrand" class="px-4 py-2 border-2 rounded-lg">
                         <option value="siemens">Siemens</option>
                         <option value="allenBradley">Allen-Bradley</option>
@@ -99,7 +100,7 @@
     </div>
 
     <script>
-        let templates = [
+        const defaultTemplates = [
             {
                 id: 'dol',
                 name: 'Khởi động trực tiếp (DOL)',
@@ -118,8 +119,8 @@
                 config: {
                     DI: [{name: 'AUTO STATUS', count: 1}, {name: 'RUN STATUS', count: 1}, {name: 'FAULT STATUS', count: 1}],
                     DO: [{name: 'CMD RUN', count: 1}],
-                    AI: [{name: 'Dieu khien tan so', count: 1}],
-                    AO: [{name: 'Phan hoi tan so', count: 1}]
+                    AI: [{name: 'Điều khiển tần số', count: 1}],
+                    AO: [{name: 'Phản hồi tần số', count: 1}]
                 }
             },
             {
@@ -135,7 +136,7 @@
             },
             {
                 id: 'temp',
-                name: '️Cảm biến nhiệt độ',
+                name: 'Cảm biến nhiệt độ',
                 icon: '🌡',
                 config: {
                     DI: [],
@@ -146,7 +147,39 @@
             }
         ];
 
-        let devices = [];
+        function loadData() {
+            try {
+                const savedTemplates = localStorage.getItem('plc_templates');
+                const savedDevices = localStorage.getItem('plc_devices');
+                const savedBrand = localStorage.getItem('plc_brand');
+                
+                return {
+                    templates: savedTemplates ? JSON.parse(savedTemplates) : defaultTemplates,
+                    devices: savedDevices ? JSON.parse(savedDevices) : [],
+                    brand: savedBrand || 'siemens'
+                };
+            } catch (e) {
+                return {
+                    templates: defaultTemplates,
+                    devices: [],
+                    brand: 'siemens'
+                };
+            }
+        }
+
+        function saveData() {
+            try {
+                localStorage.setItem('plc_templates', JSON.stringify(templates));
+                localStorage.setItem('plc_devices', JSON.stringify(devices));
+                localStorage.setItem('plc_brand', document.getElementById('plcBrand').value);
+            } catch (e) {
+                console.error('Khong the luu du lieu:', e);
+            }
+        }
+
+        const data = loadData();
+        let templates = data.templates;
+        let devices = data.devices;
         let editingTemplate = null;
 
         const formats = {
@@ -291,16 +324,19 @@
                 config: JSON.parse(JSON.stringify(t.config))
             });
             document.getElementById('qty-' + tid).value = '1';
+            saveData();
             renderDevices();
         }
 
         function removeDevice(i) {
             devices.splice(i, 1);
+            saveData();
             renderDevices();
         }
 
         function updateQty(i, v) {
             devices[i].quantity = parseInt(v) || 1;
+            saveData();
             renderDevices();
         }
 
@@ -359,7 +395,7 @@
                                 <input type="number" min="1" value="${s.count}" onchange="updateSig('${type}',${i},'count',this.value)" class="w-16 px-2 py-1 border rounded">
                                 <button onclick="removeSig('${type}',${i})" class="bg-red-500 text-white px-2 py-1 rounded">X</button>
                             </div>
-                        `).join('') || '<div class="text-gray-400 text-sm">Chua co</div>'}
+                        `).join('') || '<div class="text-gray-400 text-sm">Chưa có</div>'}
                     </div>
                 </div>
             `).join('');
@@ -393,13 +429,14 @@
             } else {
                 templates.push(editingTemplate);
             }
+            saveData();
             closeModal();
             renderTemplates();
         }
 
         function exportCSV() {
             if (devices.length === 0) {
-                alert('Chua co thiet bi!');
+                alert('Chưa có thiết bị!');
                 return;
             }
             const brand = document.getElementById('plcBrand').value;
@@ -443,14 +480,28 @@
             a.click();
         }
 
+        function clearAllData() {
+            if (confirm('Bạn có chắc muốn xoá tất cả dữ liệu? Hành động này không thể hoàn tác!')) {
+                localStorage.removeItem('plc_templates');
+                localStorage.removeItem('plc_devices');
+                localStorage.removeItem('plc_brand');
+                templates = JSON.parse(JSON.stringify(defaultTemplates));
+                devices = [];
+                document.getElementById('plcBrand').value = 'siemens';
+                renderTemplates();
+                renderDevices();
+                alert('Đã xoá tất cả dữ liệu!');
+            }
+        }
+
         document.getElementById('plcBrand').addEventListener('change', () => {
+            saveData();
             if (devices.length > 0) renderAddresses();
         });
 
+        document.getElementById('plcBrand').value = data.brand;
         renderTemplates();
         renderDevices();
     </script>
 </body>
 </html>
-
-
