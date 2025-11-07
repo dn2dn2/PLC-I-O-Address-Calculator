@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PLC Address Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen p-6">
+    <div class="max-w-7xl mx-auto">
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <h1 class="text-3xl font-bold text-blue-600">PLC I/O Address Calculator</h1>
+                <div class="flex gap-3">
+                    <select id="plcBrand" class="px-4 py-2 border-2 rounded-lg">
+                        <option value="siemens">Siemens</option>
+                        <option value="allenBradley">Allen-Bradley</option>
+                        <option value="mitsubishi">Mitsubishi</option>
+                        <option value="omron">Omron</option>
+                    </select>
+                    <button onclick="exportCSV()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Export CSV</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-4 gap-4 mb-6">
+            <div class="bg-blue-600 text-white rounded-lg p-4">
+                <div class="text-sm">Digital Input</div>
+                <div class="text-3xl font-bold" id="totalDI">0</div>
+            </div>
+            <div class="bg-green-600 text-white rounded-lg p-4">
+                <div class="text-sm">Digital Output</div>
+                <div class="text-3xl font-bold" id="totalDO">0</div>
+            </div>
+            <div class="bg-purple-600 text-white rounded-lg p-4">
+                <div class="text-sm">Analog Input</div>
+                <div class="text-3xl font-bold" id="totalAI">0</div>
+            </div>
+            <div class="bg-orange-600 text-white rounded-lg p-4">
+                <div class="text-sm">Analog Output</div>
+                <div class="text-3xl font-bold" id="totalAO">0</div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-6">
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">Thư viện thiết bị</h2>
+                    <button onclick="showAddModal()" class="bg-blue-600 text-white px-3 py-1 rounded">+ Thêm mới</button>
+                </div>
+                <div id="templateList" class="space-y-3"></div>
+            </div>
+
+            <div class="col-span-2 space-y-6">
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h2 class="text-xl font-bold mb-4">Danh sách thiết bị</h2>
+                    <div id="deviceList"></div>
+                </div>
+
+                <div id="addressTable" class="bg-white rounded-xl shadow-lg p-6" style="display:none">
+                    <h2 class="text-xl font-bold mb-4">Bảng địa chỉ</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="px-3 py-2 text-left">Thiết bị</th>
+                                    <th class="px-3 py-2 text-left">Loại</th>
+                                    <th class="px-3 py-2 text-left">Tên</th>
+                                    <th class="px-3 py-2 text-left">Địa chỉ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="addressBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl p-6 max-w-2xl w-full max-h-screen overflow-y-auto">
+            <h2 class="text-2xl font-bold mb-4">Chỉnh sửa thiết bị</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block mb-2 font-semibold">Tên thiết bị</label>
+                    <input type="text" id="modalName" class="w-full px-3 py-2 border rounded">
+                </div>
+                <div>
+                    <label class="block mb-2 font-semibold">Icon</label>
+                    <input type="text" id="modalIcon" class="w-full px-3 py-2 border rounded">
+                </div>
+                <div id="modalIO"></div>
+            </div>
+            <div class="flex justify-end gap-3 mt-6">
+                <button onclick="closeModal()" class="px-4 py-2 border rounded">Huỷ</button>
+                <button onclick="saveModal()" class="px-4 py-2 bg-blue-600 text-white rounded">Lưu</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let templates = [
+            {
+                id: 'dol',
+                name: 'Khởi động trực tiếp (DOL)',
+                icon: '⚡',
+                config: {
+                    DI: [{name: 'AUTO STATUS', count: 1}, {name: 'RUN STATUS', count: 1}, {name: 'FAULT STATUS', count: 1}],
+                    DO: [{name: 'CMD RUN', count: 1}],
+                    AI: [],
+                    AO: []
+                }
+            },
+            {
+                id: 'inv',
+                name: 'Khởi động qua biến tần (INV)',
+                icon: '🌟',
+                config: {
+                    DI: [{name: 'AUTO STATUS', count: 1}, {name: 'RUN STATUS', count: 1}, {name: 'FAULT STATUS', count: 1}],
+                    DO: [{name: 'CMD RUN', count: 1}],
+                    AI: [{name: 'Dieu khien tan so', count: 1}],
+                    AO: [{name: 'Phan hoi tan so', count: 1}]
+                }
+            },
+            {
+                id: 'valve',
+                name: 'Van điện từ',
+                icon: '🚰',
+                config: {
+                    DI: [{name: 'OPEN STATUS', count: 1}, {name: 'CLOSE STATUS', count: 1}],
+                    DO: [{name: 'CMD OPEN', count: 1}],
+                    AI: [],
+                    AO: []
+                }
+            },
+            {
+                id: 'temp',
+                name: '️Cảm biến nhiệt độ',
+                icon: '🌡',
+                config: {
+                    DI: [],
+                    DO: [],
+                    AI: [{name: 'Temperature', count: 1}],
+                    AO: []
+                }
+            }
+        ];
+
+        let devices = [];
+        let editingTemplate = null;
+
+        const formats = {
+            siemens: {
+                DI: (b, i) => `I${b}.${i}`,
+                DO: (b, i) => `Q${b}.${i}`,
+                AI: (w) => `IW${w * 2}`,
+                AO: (w) => `QW${w * 2}`
+            },
+            allenBradley: {
+                DI: (b, i) => `I:${b}/${i}`,
+                DO: (b, i) => `O:${b}/${i}`,
+                AI: (w) => `I:${w}`,
+                AO: (w) => `O:${w}`
+            },
+            mitsubishi: {
+                DI: (b, i) => `X${(b * 8 + i).toString(16).toUpperCase()}`,
+                DO: (b, i) => `Y${(b * 8 + i).toString(16).toUpperCase()}`,
+                AI: (w) => `D${w}`,
+                AO: (w) => `D${w + 1000}`
+            },
+            omron: {
+                DI: (b, i) => `${b}.${String(i).padStart(2, '0')}`,
+                DO: (b, i) => `${100 + b}.${String(i).padStart(2, '0')}`,
+                AI: (w) => `CIO${w}`,
+                AO: (w) => `CIO${w + 100}`
+            }
+        };
+
+        function renderTemplates() {
+            const html = templates.map(t => {
+                const di = t.config.DI.reduce((s, x) => s + x.count, 0);
+                const do_ = t.config.DO.reduce((s, x) => s + x.count, 0);
+                const ai = t.config.AI.reduce((s, x) => s + x.count, 0);
+                const ao = t.config.AO.reduce((s, x) => s + x.count, 0);
+                return `
+                    <div class="border rounded-lg p-3">
+                        <div class="flex gap-2 items-start">
+                            <div class="text-2xl font-bold">${t.icon}</div>
+                            <div class="flex-1">
+                                <div class="font-semibold">${t.name}</div>
+                                <div class="text-xs text-gray-600">${di ? 'DI:' + di : ''} ${do_ ? 'DO:' + do_ : ''} ${ai ? 'AI:' + ai : ''} ${ao ? 'AO:' + ao : ''}</div>
+                                <div class="flex gap-2 mt-2">
+                                    <input type="number" min="1" value="1" id="qty-${t.id}" class="w-16 px-2 py-1 border rounded text-sm">
+                                    <button onclick="addDevice('${t.id}')" class="flex-1 bg-blue-600 text-white px-2 py-1 rounded text-sm">Thêm</button>
+                                    <button onclick="editTemplate('${t.id}')" class="bg-gray-300 px-2 py-1 rounded text-sm">Sửa</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            document.getElementById('templateList').innerHTML = html;
+        }
+
+        function renderDevices() {
+            if (devices.length === 0) {
+                document.getElementById('deviceList').innerHTML = '<div class="text-center text-gray-400 py-8">Chua co thiet bi</div>';
+                document.getElementById('addressTable').style.display = 'none';
+            } else {
+                const html = devices.map((d, i) => {
+                    const di = d.config.DI.reduce((s, x) => s + x.count, 0);
+                    const do_ = d.config.DO.reduce((s, x) => s + x.count, 0);
+                    const ai = d.config.AI.reduce((s, x) => s + x.count, 0);
+                    const ao = d.config.AO.reduce((s, x) => s + x.count, 0);
+                    return `
+                        <div class="border rounded-lg p-3 mb-3">
+                            <div class="flex justify-between items-center">
+                                <div class="flex gap-2 items-center">
+                                    <span class="text-xl font-bold">${d.icon}</span>
+                                    <span class="font-semibold">${d.name}</span>
+                                    <span class="text-xs text-gray-600">DI:${di} DO:${do_} AI:${ai} AO:${ao}</span>
+                                </div>
+                                <div class="flex gap-2 items-center">
+                                    <input type="number" min="1" value="${d.quantity}" onchange="updateQty(${i}, this.value)" class="w-16 px-2 py-1 border rounded">
+                                    <button onclick="removeDevice(${i})" class="bg-red-500 text-white px-2 py-1 rounded">Xoa</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                document.getElementById('deviceList').innerHTML = html;
+                document.getElementById('addressTable').style.display = 'block';
+                renderAddresses();
+            }
+            updateTotals();
+        }
+
+        function renderAddresses() {
+            const brand = document.getElementById('plcBrand').value;
+            const fmt = formats[brand];
+            let addr = {
+                DI: {byte: 0, bit: 0},
+                DO: {byte: 0, bit: 0},
+                AI: {word: 0},
+                AO: {word: 0}
+            };
+            
+            const rows = [];
+            devices.forEach(dev => {
+                for (let n = 1; n <= dev.quantity; n++) {
+                    ['DI', 'DO', 'AI', 'AO'].forEach(type => {
+                        dev.config[type].forEach(sig => {
+                            for (let i = 0; i < sig.count; i++) {
+                                let address;
+                                if (type === 'DI' || type === 'DO') {
+                                    address = fmt[type](addr[type].byte, addr[type].bit);
+                                    addr[type].bit++;
+                                    if (addr[type].bit >= 8) {
+                                        addr[type].bit = 0;
+                                        addr[type].byte++;
+                                    }
+                                } else {
+                                    address = fmt[type](addr[type].word);
+                                    addr[type].word++;
+                                }
+                                rows.push(`
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-3 py-2">${dev.name} #${n}</td>
+                                        <td class="px-3 py-2"><span class="px-2 py-1 rounded text-xs ${type === 'DI' ? 'bg-blue-100' : type === 'DO' ? 'bg-green-100' : type === 'AI' ? 'bg-purple-100' : 'bg-orange-100'}">${type}</span></td>
+                                        <td class="px-3 py-2">${sig.name}</td>
+                                        <td class="px-3 py-2"><code class="bg-gray-100 px-2 py-1 rounded">${address}</code></td>
+                                    </tr>
+                                `);
+                            }
+                        });
+                    });
+                }
+            });
+            document.getElementById('addressBody').innerHTML = rows.join('');
+        }
+
+        function addDevice(tid) {
+            const t = templates.find(x => x.id === tid);
+            const qty = parseInt(document.getElementById('qty-' + tid).value) || 1;
+            devices.push({
+                id: Date.now(),
+                templateId: tid,
+                name: t.name,
+                icon: t.icon,
+                quantity: qty,
+                config: JSON.parse(JSON.stringify(t.config))
+            });
+            document.getElementById('qty-' + tid).value = '1';
+            renderDevices();
+        }
+
+        function removeDevice(i) {
+            devices.splice(i, 1);
+            renderDevices();
+        }
+
+        function updateQty(i, v) {
+            devices[i].quantity = parseInt(v) || 1;
+            renderDevices();
+        }
+
+        function updateTotals() {
+            const totals = {DI: 0, DO: 0, AI: 0, AO: 0};
+            devices.forEach(d => {
+                ['DI', 'DO', 'AI', 'AO'].forEach(type => {
+                    totals[type] += d.config[type].reduce((s, x) => s + x.count, 0) * d.quantity;
+                });
+            });
+            document.getElementById('totalDI').textContent = totals.DI;
+            document.getElementById('totalDO').textContent = totals.DO;
+            document.getElementById('totalAI').textContent = totals.AI;
+            document.getElementById('totalAO').textContent = totals.AO;
+        }
+
+        function showAddModal() {
+            editingTemplate = {
+                id: 'custom-' + Date.now(),
+                name: '',
+                icon: 'C',
+                config: {DI: [], DO: [], AI: [], AO: []}
+            };
+            openModal();
+        }
+
+        function editTemplate(tid) {
+            editingTemplate = JSON.parse(JSON.stringify(templates.find(t => t.id === tid)));
+            openModal();
+        }
+
+        function openModal() {
+            document.getElementById('modalName').value = editingTemplate.name;
+            document.getElementById('modalIcon').value = editingTemplate.icon;
+            renderModalIO();
+            document.getElementById('modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.add('hidden');
+            editingTemplate = null;
+        }
+
+        function renderModalIO() {
+            const types = ['DI', 'DO', 'AI', 'AO'];
+            const html = types.map(type => `
+                <div class="border rounded p-3 mb-3">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold">${type}</span>
+                        <button onclick="addSignal('${type}')" class="bg-blue-600 text-white px-2 py-1 rounded text-sm">+ Thêm</button>
+                    </div>
+                    <div id="signals-${type}">
+                        ${editingTemplate.config[type].map((s, i) => `
+                            <div class="flex gap-2 mb-2">
+                                <input type="text" value="${s.name}" onchange="updateSig('${type}',${i},'name',this.value)" class="flex-1 px-2 py-1 border rounded" placeholder="Ten">
+                                <input type="number" min="1" value="${s.count}" onchange="updateSig('${type}',${i},'count',this.value)" class="w-16 px-2 py-1 border rounded">
+                                <button onclick="removeSig('${type}',${i})" class="bg-red-500 text-white px-2 py-1 rounded">X</button>
+                            </div>
+                        `).join('') || '<div class="text-gray-400 text-sm">Chua co</div>'}
+                    </div>
+                </div>
+            `).join('');
+            document.getElementById('modalIO').innerHTML = html;
+        }
+
+        function addSignal(type) {
+            editingTemplate.config[type].push({name: '', count: 1});
+            renderModalIO();
+        }
+
+        function updateSig(type, i, field, val) {
+            editingTemplate.config[type][i][field] = field === 'count' ? parseInt(val) || 1 : val;
+        }
+
+        function removeSig(type, i) {
+            editingTemplate.config[type].splice(i, 1);
+            renderModalIO();
+        }
+
+        function saveModal() {
+            editingTemplate.name = document.getElementById('modalName').value;
+            editingTemplate.icon = document.getElementById('modalIcon').value;
+            if (!editingTemplate.name) {
+                alert('Nhap ten!');
+                return;
+            }
+            const idx = templates.findIndex(t => t.id === editingTemplate.id);
+            if (idx >= 0) {
+                templates[idx] = editingTemplate;
+            } else {
+                templates.push(editingTemplate);
+            }
+            closeModal();
+            renderTemplates();
+        }
+
+        function exportCSV() {
+            if (devices.length === 0) {
+                alert('Chua co thiet bi!');
+                return;
+            }
+            const brand = document.getElementById('plcBrand').value;
+            const fmt = formats[brand];
+            let addr = {
+                DI: {byte: 0, bit: 0},
+                DO: {byte: 0, bit: 0},
+                AI: {word: 0},
+                AO: {word: 0}
+            };
+            
+            let csv = 'Thiet bi,Loai,Ten,Dia chi\n';
+            devices.forEach(dev => {
+                for (let n = 1; n <= dev.quantity; n++) {
+                    ['DI', 'DO', 'AI', 'AO'].forEach(type => {
+                        dev.config[type].forEach(sig => {
+                            for (let i = 0; i < sig.count; i++) {
+                                let address;
+                                if (type === 'DI' || type === 'DO') {
+                                    address = fmt[type](addr[type].byte, addr[type].bit);
+                                    addr[type].bit++;
+                                    if (addr[type].bit >= 8) {
+                                        addr[type].bit = 0;
+                                        addr[type].byte++;
+                                    }
+                                } else {
+                                    address = fmt[type](addr[type].word);
+                                    addr[type].word++;
+                                }
+                                csv += `"${dev.name} #${n}",${type},"${sig.name}",${address}\n`;
+                            }
+                        });
+                    });
+                }
+            });
+            
+            const blob = new Blob([csv], {type: 'text/csv'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `plc_${brand}_${Date.now()}.csv`;
+            a.click();
+        }
+
+        document.getElementById('plcBrand').addEventListener('change', () => {
+            if (devices.length > 0) renderAddresses();
+        });
+
+        renderTemplates();
+        renderDevices();
+    </script>
+</body>
+</html>
